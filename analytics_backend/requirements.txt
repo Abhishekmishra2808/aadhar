@@ -1,0 +1,43 @@
+# Aadhaar Pulse - Analytics Backend Dependencies
+# Core Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Data Processing & Analysis
+pandas>=2.0.0
+numpy>=1.26.0
+scipy>=1.11.0
+scikit-learn>=1.3.0
+
+# Visualization (for backend report generation)
+matplotlib>=3.8.0
+seaborn>=0.13.0
+
+# LLM Integration
+openai>=1.8.0
+anthropic>=0.8.0
+httpx>=0.26.0
+
+# File Processing
+openpyxl>=3.1.0
+chardet>=5.2.0
+
+# Async Support
+aiofiles>=23.2.0
+
+# Caching & Performance
+cachetools>=5.3.0
+
+# Logging & Monitoring
+loguru>=0.7.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio==0.23.3
+httpx==0.26.0
+
+# Environment Management
+python-dotenv==1.0.0

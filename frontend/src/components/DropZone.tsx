@@ -1,15 +1,18 @@
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, FileSpreadsheet, Check } from 'lucide-react';
+import { Upload, FileSpreadsheet, Check, AlertCircle, Loader2 } from 'lucide-react';
 
 interface DropZoneProps {
   onFileUpload: (file: File) => void;
   isMinimized: boolean;
+  uploadProgress?: number;
+  uploadError?: string | null;
 }
 
-export function DropZone({ onFileUpload, isMinimized }: DropZoneProps) {
+export function DropZone({ onFileUpload, isMinimized, uploadProgress = 0, uploadError = null }: DropZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -28,6 +31,7 @@ export function DropZone({ onFileUpload, isMinimized }: DropZoneProps) {
     const files = e.dataTransfer.files;
     if (files.length > 0) {
       setUploadedFile(files[0].name);
+      setIsUploading(true);
       onFileUpload(files[0]);
     }
   }, [onFileUpload]);
@@ -36,6 +40,7 @@ export function DropZone({ onFileUpload, isMinimized }: DropZoneProps) {
     const files = e.target.files;
     if (files && files.length > 0) {
       setUploadedFile(files[0].name);
+      setIsUploading(true);
       onFileUpload(files[0]);
     }
   }, [onFileUpload]);
@@ -98,7 +103,50 @@ export function DropZone({ onFileUpload, isMinimized }: DropZoneProps) {
           }}
         >
           <AnimatePresence mode="wait">
-            {uploadedFile ? (
+            {uploadError ? (
+              <motion.div
+                key="error"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center gap-4"
+              >
+                <div className="w-20 h-20 rounded-2xl bg-red-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-10 h-10 text-red-400" />
+                </div>
+                <p className="text-white/70 text-center">
+                  <span className="text-red-400 font-medium">Upload Error</span>
+                  <br />
+                  <span className="text-sm text-white/50">{uploadError}</span>
+                  <br />
+                  <span className="text-xs text-white/30 mt-2 block">Continuing to demo mode...</span>
+                </p>
+              </motion.div>
+            ) : isUploading && uploadProgress > 0 ? (
+              <motion.div
+                key="uploading"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="flex flex-col items-center gap-4"
+              >
+                <div className="w-20 h-20 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+                  <Loader2 className="w-10 h-10 text-blue-400 animate-spin" />
+                </div>
+                <p className="text-white/70 text-center">
+                  <span className="text-white font-medium">{uploadedFile}</span>
+                  <br />
+                  <span className="text-sm">Uploading... {uploadProgress}%</span>
+                </p>
+                <div className="w-48 h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-blue-500"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+              </motion.div>
+            ) : uploadedFile ? (
               <motion.div
                 key="uploaded"
                 initial={{ opacity: 0, scale: 0.8 }}

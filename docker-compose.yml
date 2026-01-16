@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # Analytics Backend (Python/FastAPI)
+  analytics-backend:
+    build:
+      context: ./analytics_backend
+      dockerfile: Dockerfile
+    container_name: aadhaar-pulse-analytics
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=false
+      - CORS_ORIGINS=["http://localhost:5173","http://localhost:3000","http://localhost:3001"]
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - LLM_PROVIDER=${LLM_PROVIDER:-openai}
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./analytics_backend/logs:/app/logs
+      - analytics_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - aadhaar-network
+
+  # Node.js Backend (Express) - Existing
+  node-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: aadhaar-pulse-node
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=development
+      - PORT=3001
+      - ANALYTICS_API_URL=http://analytics-backend:8000
+    depends_on:
+      analytics-backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - aadhaar-network
+
+  # Frontend (React/Vite)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: aadhaar-pulse-frontend
+    ports:
+      - "5173:80"
+    environment:
+      - VITE_API_URL=http://localhost:3001
+      - VITE_ANALYTICS_URL=http://localhost:8000
+    depends_on:
+      - node-backend
+      - analytics-backend
+    restart: unless-stopped
+    networks:
+      - aadhaar-network
+
+  # Redis Cache (optional, for production)
+  redis:
+    image: redis:7-alpine
+    container_name: aadhaar-pulse-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - aadhaar-network
+    profiles:
+      - production
+
+networks:
+  aadhaar-network:
+    driver: bridge
+
+volumes:
+  analytics_data:
+  redis_data:
