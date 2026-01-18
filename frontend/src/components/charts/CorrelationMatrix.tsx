@@ -8,7 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { GitBranch, Info } from 'lucide-react';
-import type { CorrelationResult } from '../services/analyticsApi';
+import type { CorrelationResult } from '../../services/analyticsApi';
 
 interface CorrelationMatrixProps {
   correlationMatrix: Record<string, Record<string, number>>;

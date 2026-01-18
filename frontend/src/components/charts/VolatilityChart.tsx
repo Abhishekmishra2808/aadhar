@@ -8,7 +8,7 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, AlertTriangle, MapPin, Clock, ChevronDown, ChevronUp } from 'lucide-react';
-import type { VolatilityResult, SeasonalPattern } from '../services/analyticsApi';
+import type { VolatilityResult, SeasonalPattern } from '../../services/analyticsApi';
 
 interface VolatilityChartProps {
   volatilityResults: VolatilityResult[];
@@ -255,10 +255,11 @@ export const VolatilityChart: React.FC<VolatilityChartProps> = ({
                           </div>
                         </div>
                         
-                        {result.interpretation && (
+                        {result.temporal_pattern && (
                           <div className="px-4 pb-4">
                             <div className="p-3 bg-gray-900/50 rounded-lg text-sm text-gray-300">
-                              {result.interpretation}
+                              <span className="text-gray-500">Pattern: </span>
+                              {result.temporal_pattern}
                             </div>
                           </div>
                         )}
@@ -324,19 +325,9 @@ export const VolatilityChart: React.FC<VolatilityChartProps> = ({
                         </span>
                       </div>
                       
-                      {pattern.peak_periods.length > 0 && (
-                        <div className="text-sm text-gray-400 mb-2">
-                          <span className="text-gray-500">Peak periods: </span>
-                          {pattern.peak_periods.join(', ')}
-                        </div>
-                      )}
-                      
-                      {pattern.trough_periods.length > 0 && (
-                        <div className="text-sm text-gray-400">
-                          <span className="text-gray-500">Trough periods: </span>
-                          {pattern.trough_periods.join(', ')}
-                        </div>
-                      )}
+                      <div className="text-sm text-gray-300">
+                        {pattern.description}
+                      </div>
                     </div>
                   ))}
                 </div>
