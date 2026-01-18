@@ -182,26 +182,26 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   if (loading) {
     return (
       <motion.div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-screen flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
+          <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-blue-500 animate-spin mx-auto mb-3 sm:mb-4" />
+          <h2 className="text-lg sm:text-xl font-semibold text-white mb-2">
             Analyzing Your Data
           </h2>
           {status && (
             <div className="text-gray-400">
-              <p>Stage: {status.current_stage}</p>
-              <div className="w-64 h-2 bg-gray-800 rounded-full mt-4 overflow-hidden">
+              <p className="text-sm sm:text-base">Stage: {status.current_stage}</p>
+              <div className="w-48 sm:w-64 h-2 bg-gray-800 rounded-full mt-3 sm:mt-4 overflow-hidden mx-auto">
                 <motion.div
                   className="h-full bg-blue-500"
                   initial={{ width: 0 }}
                   animate={{ width: `${status.progress}%` }}
                 />
               </div>
-              <p className="text-sm mt-2">{status.progress}% complete</p>
+              <p className="text-xs sm:text-sm mt-2">{status.progress}% complete</p>
             </div>
           )}
         </div>
@@ -213,19 +213,19 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   if (error) {
     return (
       <motion.div
-        className="min-h-screen flex items-center justify-center"
+        className="min-h-screen flex items-center justify-center p-4"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        <div className="text-center max-w-md">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-white mb-2">
+        <div className="text-center max-w-md px-4">
+          <AlertTriangle className="w-10 h-10 sm:w-12 sm:h-12 text-red-500 mx-auto mb-3 sm:mb-4" />
+          <h2 className="text-lg sm:text-xl font-semibold text-white mb-2">
             Analysis Error
           </h2>
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="text-sm sm:text-base text-gray-400 mb-4">{error}</p>
           <button
             onClick={onNewAnalysis}
-            className="px-6 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors"
+            className="px-6 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors text-sm sm:text-base touch-manipulation"
           >
             Try Again
           </button>
@@ -238,40 +238,40 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   if (!analysisData) {
     return (
       <motion.div
-        className="min-h-screen p-6 pt-20"
+        className="min-h-screen p-4 sm:p-6 pt-16 sm:pt-20"
         variants={containerVariants}
         initial="hidden"
         animate="visible"
       >
         <div className="max-w-7xl mx-auto">
           <motion.div
-            className="mb-8"
+            className="mb-6 sm:mb-8"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <h1 className="text-3xl font-bold text-white/90 mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white/90 mb-2">
               Aadhaar Pulse Dashboard
             </h1>
-            <p className="text-white/50">
+            <p className="text-sm sm:text-base text-white/50">
               Upload a dataset to begin analysis
             </p>
           </motion.div>
 
           <motion.div
-            className="text-center py-20"
+            className="text-center py-12 sm:py-20"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
           >
-            <Brain className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-400 mb-2">
+            <Brain className="w-12 h-12 sm:w-16 sm:h-16 text-gray-600 mx-auto mb-3 sm:mb-4" />
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-400 mb-2">
               No Analysis Data
             </h2>
-            <p className="text-gray-500 mb-6">
+            <p className="text-sm sm:text-base text-gray-500 mb-4 sm:mb-6 px-4">
               Upload a CSV, Excel, or JSON file to start the analytical pipeline
             </p>
             <button
               onClick={onNewAnalysis}
-              className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white font-medium hover:opacity-90 transition-opacity"
+              className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg text-white font-medium hover:opacity-90 transition-opacity text-sm sm:text-base touch-manipulation"
             >
               Upload Dataset
             </button>
@@ -283,7 +283,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   return (
     <motion.div
-      className="min-h-screen p-6 pt-20"
+      className="min-h-screen p-3 sm:p-6 pt-16 sm:pt-20"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -291,20 +291,20 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div
-          className="flex items-start justify-between mb-8"
+          className="flex flex-col sm:flex-row items-start justify-between gap-4 mb-6 sm:mb-8"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <div>
-            <h1 className="text-3xl font-bold text-white/90 mb-2">
+          <div className="flex-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white/90 mb-1 sm:mb-2">
               Aadhaar Pulse Dashboard
             </h1>
-            <p className="text-white/50">
+            <p className="text-sm sm:text-base text-white/50">
               Analysis completed • {analysisData?.data_summary?.total_records?.toLocaleString() || 0} records analyzed
             </p>
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={() => {
                 if (currentJobId) {
@@ -318,30 +318,31 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 }
               }}
               disabled={!currentJobId}
-              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
               title="Refresh"
             >
               <RefreshCw className="w-5 h-5" />
             </button>
             <button
               onClick={handleExport}
-              className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors flex items-center justify-center gap-2 text-sm touch-manipulation"
             >
               <Download className="w-4 h-4" />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </button>
             <button
               onClick={onNewAnalysis}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors"
+              className="flex-1 sm:flex-none px-3 sm:px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-white transition-colors text-sm touch-manipulation"
             >
-              New Analysis
+              <span className="hidden sm:inline">New Analysis</span>
+              <span className="sm:hidden">New</span>
             </button>
           </div>
         </motion.div>
 
         {/* Tab Navigation */}
         <motion.div
-          className="flex gap-1 p-1 bg-gray-900/50 rounded-xl mb-6 overflow-x-auto"
+          className="flex gap-1 p-1 bg-gray-900/50 rounded-xl mb-4 sm:mb-6 overflow-x-auto scrollbar-hide"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
         >
@@ -349,14 +350,15 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors touch-manipulation ${
                 activeTab === tab.key
                   ? 'bg-blue-500 text-white'
                   : 'text-gray-400 hover:text-white hover:bg-gray-800'
               }`}
             >
               {tab.icon}
-              {tab.label}
+              <span className="hidden sm:inline">{tab.label}</span>
+              <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
               {tab.count !== undefined && tab.count > 0 && (
                 <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
                   activeTab === tab.key ? 'bg-blue-400' : 'bg-gray-700'
@@ -385,28 +387,28 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 )}
                 
                 {/* Quick Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                    <div className="text-gray-400 text-sm mb-1">Strong Correlations</div>
-                    <div className="text-2xl font-bold text-white">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-700">
+                    <div className="text-gray-400 text-xs sm:text-sm mb-1">Strong Correlations</div>
+                    <div className="text-xl sm:text-2xl font-bold text-white">
                       {analysisData.statistical_abstract?.correlation_findings?.strong_correlations?.length || 0}
                     </div>
                   </div>
-                  <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                    <div className="text-gray-400 text-sm mb-1">High Volatility Regions</div>
-                    <div className="text-2xl font-bold text-orange-400">
+                  <div className="bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-700">
+                    <div className="text-gray-400 text-xs sm:text-sm mb-1">High Volatility Regions</div>
+                    <div className="text-xl sm:text-2xl font-bold text-orange-400">
                       {analysisData.statistical_abstract?.volatility_findings?.high_volatility_regions?.length || 0}
                     </div>
                   </div>
-                  <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                    <div className="text-gray-400 text-sm mb-1">Outlier Clusters</div>
-                    <div className="text-2xl font-bold text-purple-400">
+                  <div className="bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-700">
+                    <div className="text-gray-400 text-xs sm:text-sm mb-1">Outlier Clusters</div>
+                    <div className="text-xl sm:text-2xl font-bold text-purple-400">
                       {analysisData.statistical_abstract?.dimensional_findings?.outlier_clusters?.length || 0}
                     </div>
                   </div>
-                  <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                    <div className="text-gray-400 text-sm mb-1">Anomalies Detected</div>
-                    <div className="text-2xl font-bold text-red-400">
+                  <div className="bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-700">
+                    <div className="text-gray-400 text-xs sm:text-sm mb-1">Anomalies Detected</div>
+                    <div className="text-xl sm:text-2xl font-bold text-red-400">
                       {analysisData.statistical_abstract?.anomaly_findings?.total_anomalies || 0}
                     </div>
                   </div>
@@ -415,8 +417,8 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                 {/* Top Anomalies Preview */}
                 {analysisData.statistical_abstract?.anomaly_findings?.anomalies && 
                  analysisData.statistical_abstract.anomaly_findings.anomalies.length > 0 && (
-                  <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
-                    <h3 className="text-lg font-semibold text-white mb-4">
+                  <div className="bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-700">
+                    <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4">
                       Top Anomalies
                     </h3>
                     <AnomalyList 
@@ -425,7 +427,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
                     {analysisData.statistical_abstract.anomaly_findings.anomalies.length > 5 && (
                       <button
                         onClick={() => setActiveTab('anomalies')}
-                        className="mt-4 text-blue-400 hover:text-blue-300 text-sm"
+                        className="mt-3 sm:mt-4 text-blue-400 hover:text-blue-300 text-xs sm:text-sm touch-manipulation"
                       >
                         View all {analysisData.statistical_abstract.anomaly_findings.anomalies.length} anomalies →
                       </button>
@@ -471,7 +473,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             )}
 
             {activeTab === 'anomalies' && (
-              <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+              <div className="bg-gray-900/50 rounded-xl p-3 sm:p-4 border border-gray-700">
                 <AnomalyList anomalies={analysisData.statistical_abstract?.anomaly_findings?.anomalies || []} />
               </div>
             )}
