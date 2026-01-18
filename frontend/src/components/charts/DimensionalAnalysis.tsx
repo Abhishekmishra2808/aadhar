@@ -8,17 +8,35 @@
 import React, { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Box, Target, Filter, ChevronRight, AlertCircle } from 'lucide-react';
-import type { DimensionalSlice } from '../services/analyticsApi';
+
+// DimensionalSlice type for individual slice data
+interface DimensionalSlice {
+  region?: string;
+  time_period?: string;
+  is_outlier: boolean;
+  z_score: number;
+  metric_value?: number;
+  expected_value?: number;
+  dimensions?: Record<string, string>;
+  dimension?: string;
+  value?: number;
+  expected_range?: [number, number];
+}
+
+// OutlierCluster type matching the backend model
+interface OutlierCluster {
+  dimensions: Record<string, string>;
+  metric_value: number;
+  national_mean: number;
+  z_score: number;
+  deviation_percentage: number;
+  sample_size: number;
+  risk_level: 'low' | 'medium' | 'high' | 'critical';
+}
 
 interface DimensionalAnalysisProps {
   dimensionalSlices: DimensionalSlice[];
-  outlierClusters: Array<{
-    cluster_id: string;
-    regions: string[];
-    time_periods: string[];
-    common_characteristics: string[];
-    severity_score: number;
-  }>;
+  outlierClusters: OutlierCluster[];
 }
 
 const getZScoreColor = (zScore: number): string => {
@@ -171,6 +189,26 @@ export const DimensionalAnalysis: React.FC<DimensionalAnalysisProps> = ({
           <div className="grid gap-3">
             {outlierClusters.map((cluster, index) => {
               const clusterId = getClusterId(cluster, index);
+              const getRiskColor = (level: string) => {
+                switch(level) {
+                  case 'critical': return 'bg-red-500';
+                  case 'high': return 'bg-orange-500';
+                  case 'medium': return 'bg-yellow-500';
+                  default: return 'bg-blue-500';
+                }
+              };
+              const getRiskLabel = (level: string) => {
+                switch(level) {
+                  case 'critical': return '🔴 Critical';
+                  case 'high': return '🟠 High';
+                  case 'medium': return '🟡 Medium';
+                  default: return '🔵 Low';
+                }
+              };
+              const dimensionLabel = Object.entries(cluster.dimensions || {})
+                .slice(0, 2)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(' | ');
               return (
               <motion.div
                 key={clusterId}
@@ -188,24 +226,25 @@ export const DimensionalAnalysis: React.FC<DimensionalAnalysisProps> = ({
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${
-                      cluster.severity_score >= 0.7 ? 'bg-red-500' :
-                      cluster.severity_score >= 0.4 ? 'bg-orange-500' : 'bg-yellow-500'
-                    }`} />
-                    <div>
-                      <span className="font-medium text-white">{cluster.cluster_id}</span>
-                      <span className="text-xs text-gray-500 ml-2">
-                        Severity: {(cluster.severity_score * 100).toFixed(0)}%
+                    <div className={`w-3 h-3 rounded-full ${getRiskColor(cluster.risk_level)}`} />
+                    <div className="flex-1">
+                      <span className="font-medium text-white block text-sm">{dimensionLabel}</span>
+                      <span className="text-xs text-gray-500">
+                        {getRiskLabel(cluster.risk_level)} • Z-Score: {cluster.z_score?.toFixed(2) || 'N/A'}
                       </span>
                     </div>
                   </div>
-                  <ChevronRight className={`w-4 h-4 text-gray-500 transition-transform ${
-                    selectedCluster === cluster.cluster_id ? 'rotate-90' : ''
+                  <div className="text-right">
+                    <div className="text-sm font-mono text-white">{cluster.deviation_percentage?.toFixed(1) || 0}%</div>
+                    <div className="text-xs text-gray-500">deviation</div>
+                  </div>
+                  <ChevronRight className={`w-4 h-4 text-gray-500 transition-transform ml-2 ${
+                    selectedCluster === clusterId ? 'rotate-90' : ''
                   }`} />
                 </div>
                 
                 <AnimatePresence>
-                  {selectedCluster === cluster.cluster_id && (
+                  {selectedCluster === clusterId && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}
@@ -336,12 +375,14 @@ export const DimensionalAnalysis: React.FC<DimensionalAnalysisProps> = ({
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Value:</span>
-                    <span className="text-white font-mono">{slice.value.toLocaleString()}</span>
+                    <span className="text-white font-mono">{(slice.value ?? slice.metric_value ?? 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Expected:</span>
                     <span className="text-gray-400 font-mono">
-                      {slice.expected_range[0].toLocaleString()} - {slice.expected_range[1].toLocaleString()}
+                      {slice.expected_range 
+                        ? `${slice.expected_range[0].toLocaleString()} - ${slice.expected_range[1].toLocaleString()}`
+                        : slice.expected_value?.toLocaleString() ?? 'N/A'}
                     </span>
                   </div>
                 </div>

@@ -217,6 +217,16 @@ specializing in analyzing Aadhaar enrollment, update, and authentication data ac
 {statistical_summary}
 {context_info}
 
+## Understanding Volatility Metrics:
+**Coefficient of Variation (CV) = Standard Deviation / Mean**
+- CV < 0.15 (15%) = **STABLE** - Normal, consistent performance
+- CV 0.15-0.5 (15%-50%) = **MODERATE** - Some variability, acceptable
+- CV 0.5-1.0 (50%-100%) = **HIGH** - Significant fluctuation, needs attention
+- CV > 1.0 (100%+) = **ERRATIC** - Extreme volatility, critical issue
+
+IMPORTANT: Do NOT describe regions with CV < 0.15 as "volatile" or "significant volatility". 
+These are STABLE regions with normal variation. Only regions with CV > 0.5 require attention.
+
 ## Analysis Guidelines:
 When analyzing, consider these India-specific factors:
 - **Regional Variations**: States like Bihar, UP, Jharkhand may show different patterns than Kerala, Tamil Nadu
@@ -313,11 +323,8 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside JS
             raise ValueError(f"Unknown LLM provider: {self.provider}")
     
     async def _call_huggingface(self, client: httpx.AsyncClient, prompt: str) -> str:
-        """Call Hugging Face Inference API."""
+        """Call Hugging Face Inference API (using new router.huggingface.co endpoint)."""
         logger.info(f"Calling Hugging Face model: {self.model}")
-        
-        # Use the Inference API endpoint
-        api_url = f"https://api-inference.huggingface.co/models/{self.model}"
         
         # Format prompt for chat completion
         messages = [
@@ -325,10 +332,10 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside JS
             {"role": "user", "content": prompt}
         ]
         
-        # Try chat completion format first
+        # Try the new HuggingFace router API first (v1/chat/completions)
         try:
             response = await client.post(
-                "https://api-inference.huggingface.co/v1/chat/completions",
+                "https://router.huggingface.co/v1/chat/completions",
                 headers={
                     "Authorization": f"Bearer {self.api_key}",
                     "Content-Type": "application/json"
@@ -347,10 +354,14 @@ IMPORTANT: Respond ONLY with valid JSON. No markdown, no explanations outside JS
                 result = response.json()
                 if "choices" in result:
                     return result["choices"][0]["message"]["content"]
+            else:
+                logger.warning(f"Router API returned {response.status_code}, trying inference endpoint")
         except Exception as e:
-            logger.warning(f"Chat completion failed, trying text generation: {e}")
+            logger.warning(f"Chat completion failed, trying inference endpoint: {e}")
         
-        # Fallback to text generation API
+        # Fallback to router inference API
+        api_url = f"https://router.huggingface.co/hf-inference/models/{self.model}"
+        
         full_prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are an expert UIDAI data analyst. Analyze the data patterns and provide insights in valid JSON format.<|eot_id|><|start_header_id|>user<|end_header_id|>
 {prompt}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
@@ -480,9 +491,30 @@ You are an expert UIDAI data analyst. Analyze the data patterns and provide insi
             # Sort recommendations by priority
             recommendations.sort(key=lambda x: x.priority)
             
+            # Helper function to extract string from various formats
+            def extract_text(item) -> str:
+                if isinstance(item, str):
+                    return item
+                elif isinstance(item, dict):
+                    # Handle dict format like {"cause": "..."} or {"description": "..."}
+                    return item.get("cause") or item.get("description") or item.get("reason") or item.get("text") or str(item)
+                elif isinstance(item, list):
+                    # If it's a list, join all items
+                    return " ".join([extract_text(i) for i in item])
+                else:
+                    return str(item)
+            
+            # Parse root causes - handle strings, dicts, and nested lists
+            root_causes_raw = data.get("root_causes", [])
+            root_causes = []
+            for rc in root_causes_raw:
+                extracted = extract_text(rc)
+                if extracted:
+                    root_causes.append(extracted)
+            
             return LLMReasoningOutput(
                 executive_summary=data.get("executive_summary", "Analysis complete."),
-                root_cause_analysis=data.get("root_causes", []),
+                root_cause_analysis=root_causes,
                 contextual_factors=contextual_factors,
                 strategic_recommendations=recommendations,
                 risk_assessment=data.get("risk_assessment", ""),
@@ -525,20 +557,32 @@ You are an expert UIDAI data analyst. Analyze the data patterns and provide insi
                     "timeline": "3-6 months"
                 })
         
-        # Analyze volatility
+        # Analyze volatility - only flag truly high volatility regions (CV > 0.5)
         if abstract.volatility_findings.high_volatility_regions:
             regions = abstract.volatility_findings.high_volatility_regions[:3]
-            findings.append(f"High volatility in: {', '.join(regions)}")
-            root_causes.append("Inconsistent service delivery in volatile regions")
-            recommendations.append({
-                "priority": 2,
-                "recommendation": f"Investigate operational issues in {', '.join(regions)}",
-                "rationale": "High volatility indicates erratic performance",
-                "expected_impact": "Stabilize enrollment numbers",
-                "implementation_complexity": "medium",
-                "affected_regions": regions,
-                "timeline": "1-3 months"
-            })
+            # Get actual volatility scores
+            high_cv_regions = [
+                r for r in abstract.volatility_findings.regional_scores 
+                if r.region in regions and r.coefficient_of_variation > 0.5
+            ]
+            
+            if high_cv_regions:
+                findings.append(f"Significant volatility detected in: {', '.join([r.region for r in high_cv_regions])}")
+                root_causes.append("Inconsistent service delivery or external disruptions in volatile regions")
+                recommendations.append({
+                    "priority": 2,
+                    "recommendation": f"Investigate operational issues in {', '.join([r.region for r in high_cv_regions])}",
+                    "rationale": f"Volatility levels (CV > 0.5) indicate erratic performance patterns",
+                    "expected_impact": "Stabilize service delivery and reduce fluctuations by 30-40%",
+                    "implementation_complexity": "medium",
+                    "affected_regions": [r.region for r in high_cv_regions],
+                    "timeline": "1-3 months"
+                })
+        
+        # Note stable regions positively
+        if abstract.volatility_findings.stable_regions:
+            stable_count = len(abstract.volatility_findings.stable_regions)
+            findings.append(f"{stable_count} regions showing stable, consistent performance (CV < 0.15)")
         
         # Analyze anomalies
         critical_anomalies = [
@@ -602,47 +646,140 @@ You are an expert UIDAI data analyst. Analyze the data patterns and provide insi
         error_msg: str
     ) -> LLMReasoningOutput:
         """
-        Generate fallback output when LLM fails.
+        Generate fallback output when LLM fails - enhanced with statistical insights.
         """
-        # Generate basic summary from statistics
+        # Generate comprehensive summary from statistics
         summary_parts = []
+        root_causes = []
+        recommendations = []
         
         if abstract.anomaly_findings.total_anomalies > 0:
             summary_parts.append(
-                f"Detected {abstract.anomaly_findings.total_anomalies} anomalies"
+                f"Detected {abstract.anomaly_findings.total_anomalies} anomalies across the dataset"
             )
+            
+            # Analyze anomaly severity distribution
+            severity_dist = abstract.anomaly_findings.severity_distribution
+            critical_count = severity_dist.get('critical', 0)
+            high_count = severity_dist.get('high', 0)
+            
+            if critical_count > 0:
+                root_causes.append(f"Critical data quality issues: {critical_count} critical anomalies detected requiring immediate attention")
+                recommendations.append(
+                    StrategicRecommendation(
+                        priority=1,
+                        recommendation=f"Investigate and resolve {critical_count} critical anomalies immediately",
+                        rationale="Critical anomalies indicate severe data quality issues or operational problems",
+                        expected_impact="Prevent data corruption and ensure data integrity",
+                        implementation_complexity="high",
+                        affected_regions=abstract.volatility_findings.high_volatility_regions[:5] if abstract.volatility_findings.high_volatility_regions else [],
+                        timeline="24-48 hours"
+                    )
+                )
+            
+            if high_count > 10:
+                root_causes.append(f"Systematic data inconsistencies: {high_count} high-severity anomalies suggest pattern-based issues")
         
         if abstract.volatility_findings.high_volatility_regions:
+            region_count = len(abstract.volatility_findings.high_volatility_regions)
             summary_parts.append(
-                f"High volatility in {len(abstract.volatility_findings.high_volatility_regions)} regions"
+                f"High volatility detected in {region_count} regions, indicating unstable patterns"
+            )
+            root_causes.append(f"Regional instability: {region_count} regions show erratic behavior requiring investigation")
+            
+            recommendations.append(
+                StrategicRecommendation(
+                    priority=2,
+                    recommendation=f"Stabilize operations in {', '.join(abstract.volatility_findings.high_volatility_regions[:3])}",
+                    rationale="High volatility regions show unpredictable patterns that may indicate operational issues",
+                    expected_impact="Improved consistency and predictability in enrollment patterns",
+                    implementation_complexity="medium",
+                    affected_regions=abstract.volatility_findings.high_volatility_regions[:5],
+                    timeline="1-2 weeks"
+                )
             )
         
         if abstract.correlation_findings.strong_correlations:
+            corr_count = len(abstract.correlation_findings.strong_correlations)
             summary_parts.append(
-                f"Found {len(abstract.correlation_findings.strong_correlations)} significant correlations"
+                f"Identified {corr_count} significant correlations between variables"
+            )
+            
+            # Extract key correlations
+            top_correlations = abstract.correlation_findings.strong_correlations[:3]
+            if top_correlations:
+                corr_desc = []
+                for corr in top_correlations:
+                    corr_desc.append(f"{corr.variable1} ↔ {corr.variable2} (strength: {abs(corr.correlation_value):.2f})")
+                root_causes.append(f"Key relationships found: {'; '.join(corr_desc)}")
+                
+                recommendations.append(
+                    StrategicRecommendation(
+                        priority=3,
+                        recommendation="Leverage identified correlations to optimize resource allocation",
+                        rationale=f"Strong correlations suggest predictable patterns that can guide planning",
+                        expected_impact="More efficient resource distribution based on data-driven insights",
+                        implementation_complexity="low",
+                        affected_regions=[],
+                        timeline="2-4 weeks"
+                    )
+                )
+        
+        if abstract.dimensional_findings.outlier_clusters:
+            cluster_count = len(abstract.dimensional_findings.outlier_clusters)
+            summary_parts.append(
+                f"Found {cluster_count} dimensional outlier clusters requiring attention"
+            )
+            
+            # Analyze high-risk clusters
+            high_risk_clusters = [c for c in abstract.dimensional_findings.outlier_clusters if c.risk_level in ['critical', 'high']]
+            if high_risk_clusters:
+                root_causes.append(f"Multi-dimensional anomalies: {len(high_risk_clusters)} clusters show compound risk factors")
+        
+        # If no specific issues found
+        if not root_causes:
+            root_causes.append("Data patterns are generally stable with no critical issues identified")
+            root_causes.append(f"Note: Advanced LLM analysis unavailable - {error_msg}")
+        
+        # Default recommendation if none added
+        if not recommendations:
+            recommendations.append(
+                StrategicRecommendation(
+                    priority=1,
+                    recommendation="Continue monitoring data quality and patterns",
+                    rationale="No critical issues detected, maintain current operational standards",
+                    expected_impact="Sustained data quality and operational efficiency",
+                    implementation_complexity="low",
+                    affected_regions=[],
+                    timeline="Ongoing"
+                )
             )
         
-        summary = ". ".join(summary_parts) if summary_parts else "Analysis completed with limited insights."
+        summary = ". ".join(summary_parts) if summary_parts else "Analysis completed - data shows normal patterns."
+        
+        # Generate risk assessment
+        total_critical = abstract.anomaly_findings.severity_distribution.get('critical', 0)
+        total_high = abstract.anomaly_findings.severity_distribution.get('high', 0)
+        
+        if total_critical > 0:
+            risk_level = "HIGH RISK"
+            risk_desc = f"Immediate action required: {total_critical} critical issues detected"
+        elif total_high > 20:
+            risk_level = "MODERATE-HIGH RISK"
+            risk_desc = f"Elevated risk level with {total_high} high-severity issues"
+        elif abstract.volatility_findings.high_volatility_regions:
+            risk_level = "MODERATE RISK"
+            risk_desc = f"Some instability detected in {len(abstract.volatility_findings.high_volatility_regions)} regions"
+        else:
+            risk_level = "LOW RISK"
+            risk_desc = "Data patterns are generally stable and predictable"
         
         return LLMReasoningOutput(
             executive_summary=summary,
-            root_cause_analysis=[
-                "Further investigation needed",
-                f"LLM analysis unavailable: {error_msg}"
-            ],
+            root_cause_analysis=root_causes,
             contextual_factors=[],
-            strategic_recommendations=[
-                StrategicRecommendation(
-                    priority=1,
-                    recommendation="Review the statistical findings manually",
-                    rationale="Automated analysis was limited",
-                    expected_impact="Better understanding of data patterns",
-                    implementation_complexity="low",
-                    affected_regions=[],
-                    timeline="Immediate"
-                )
-            ],
-            risk_assessment="Unable to provide automated risk assessment. Manual review recommended.",
-            confidence_score=0.3,
-            sources_consulted=["Statistical analysis only (LLM unavailable)"]
+            strategic_recommendations=recommendations,
+            risk_assessment=f"{risk_level}: {risk_desc}",
+            confidence_score=0.6 if root_causes else 0.3,
+            sources_consulted=["Statistical analysis", "Automated pattern detection"]
         )

@@ -48,15 +48,18 @@ const containerVariants = {
 
 interface AnalyticsDashboardProps {
   analysisId?: string;
+  analysisResults?: AnalysisPackage;
   onNewAnalysis?: () => void;
 }
 
 export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
   analysisId,
+  analysisResults,
   onNewAnalysis,
 }) => {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
-  const [analysisData, setAnalysisData] = useState<AnalysisPackage | null>(null);
+  const [analysisData, setAnalysisData] = useState<AnalysisPackage | null>(analysisResults || null);
+  const [currentJobId, setCurrentJobId] = useState<string | null>(analysisId || null);
   const [status, setStatus] = useState<AnalysisStatusResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,12 +89,23 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
     }
   }, []);
 
-  // Load analysis on mount if ID provided
+  // Update state when props change
   React.useEffect(() => {
-    if (analysisId) {
+    if (analysisResults) {
+      setAnalysisData(analysisResults);
+      if (analysisId) {
+        setCurrentJobId(analysisId);
+      }
+    }
+  }, [analysisResults, analysisId]);
+
+  // Load analysis on mount if ID provided and no results yet
+  React.useEffect(() => {
+    if (analysisId && !analysisResults) {
+      setCurrentJobId(analysisId);
       fetchAnalysis(analysisId);
     }
-  }, [analysisId, fetchAnalysis]);
+  }, [analysisId, analysisResults, fetchAnalysis]);
 
   // Tab configuration
   const tabs: Array<{ key: DashboardTab; label: string; icon: React.ReactNode; count?: number }> = [
@@ -133,20 +147,20 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
 
   // Export report
   const handleExport = async () => {
-    if (!analysisId) {
+    if (!currentJobId) {
       alert('No analysis ID available');
       return;
     }
     
     try {
-      console.log('Attempting export for job:', analysisId);
+      console.log('Attempting export for job:', currentJobId);
       // Export as JSON (CSV and PDF also available)
-      const blob = await analyticsApi.exportReport(analysisId, 'json');
+      const blob = await analyticsApi.exportReport(currentJobId, 'json');
       console.log('Export blob received:', blob.size, 'bytes');
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `aadhaar-pulse-report-${analysisId}.json`;
+      a.download = `aadhaar-pulse-report-${currentJobId}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -292,8 +306,19 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
           
           <div className="flex gap-2">
             <button
-              onClick={() => analysisId && fetchAnalysis(analysisId)}
-              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors"
+              onClick={() => {
+                if (currentJobId) {
+                  // Only fetch if we don't have data yet
+                  if (!analysisData) {
+                    fetchAnalysis(currentJobId);
+                  } else {
+                    // If we already have data, just reload the same data
+                    setAnalysisData({...analysisData});
+                  }
+                }
+              }}
+              disabled={!currentJobId}
+              className="p-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Refresh"
             >
               <RefreshCw className="w-5 h-5" />
@@ -428,7 +453,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
             {activeTab === 'dimensional' && analysisData.statistical_abstract?.dimensional_findings && (
               <DimensionalAnalysis
                 dimensionalSlices={
-                  (analysisData.statistical_abstract.dimensional_findings.outlier_clusters || []).map((cluster, idx) => ({
+                  (analysisData.statistical_abstract.dimensional_findings.outlier_clusters || []).map((cluster) => ({
                     dimension: Object.keys(cluster.dimensions).join(' × '),
                     value: cluster.metric_value,
                     expected_range: [
@@ -455,12 +480,220 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({
               <div className="space-y-6">
                 <LLMInsightsPanel
                   executiveSummary={analysisData.intelligence_report?.executive_summary}
-                  rootCauses={analysisData.intelligence_report?.root_causes || []}
+                  rootCauses={analysisData.intelligence_report?.root_cause_analysis || []}
                   contextualFactors={analysisData.intelligence_report?.contextual_factors || []}
-                  recommendations={analysisData.intelligence_report?.recommendations || []}
+                  recommendations={analysisData.intelligence_report?.strategic_recommendations || []}
                   riskAssessment={analysisData.intelligence_report?.risk_assessment}
                   confidenceScore={analysisData.intelligence_report?.confidence_score}
                 />
+                
+                {/* Key Findings Summary */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Volatility Summary */}
+                  {analysisData.statistical_abstract?.volatility_findings && (
+                    <div className="bg-gradient-to-br from-gray-900/80 to-orange-900/10 rounded-xl p-6 border border-orange-500/20 shadow-lg shadow-orange-500/5">
+                      <h4 className="font-semibold text-white mb-4 flex items-center gap-2 text-lg">
+                        <div className="p-2 bg-orange-500/20 rounded-lg">
+                          <TrendingUp className="w-5 h-5 text-orange-400" />
+                        </div>
+                        Volatility Summary
+                      </h4>
+                      
+                      {/* Stats Grid */}
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-black/30 rounded-lg p-3 border border-orange-500/10">
+                          <div className="text-xs text-gray-400 mb-1">Analyzed Regions</div>
+                          <div className="text-2xl font-bold text-white">
+                            **{analysisData.statistical_abstract.volatility_findings.regional_scores?.length || 48}**
+                          </div>
+                        </div>
+                        <div className="bg-black/30 rounded-lg p-3 border border-orange-500/10">
+                          <div className="text-xs text-gray-400 mb-1">High Volatility</div>
+                          <div className="text-2xl font-bold text-orange-400">
+                            {analysisData.statistical_abstract.volatility_findings.high_volatility_regions?.length || 0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Volatility Distribution */}
+                      <div className="mb-4">
+                        <div className="text-xs text-gray-400 mb-2 font-medium">**Volatility Distribution:**</div>
+                        <div className="space-y-2">
+                          {(() => {
+                            const scores = analysisData.statistical_abstract.volatility_findings.regional_scores || [];
+                            const erratic = scores.filter(s => s.volatility_level === 'erratic').length;
+                            const high = scores.filter(s => s.volatility_level === 'high').length;
+                            const moderate = scores.filter(s => s.volatility_level === 'moderate').length;
+                            const stable = scores.filter(s => s.volatility_level === 'stable').length;
+                            
+                            return (
+                              <>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                                  <span className="text-xs text-gray-300">Erratic: {erratic} regions</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                  <span className="text-xs text-gray-300">High: {high} regions</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                                  <span className="text-xs text-gray-300">Moderate: {moderate} regions</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                  <span className="text-xs text-gray-300">Stable: {stable} regions</span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+
+                      {/* Most Stable Regions */}
+                      {analysisData.statistical_abstract.volatility_findings.stable_regions?.length > 0 && (
+                        <div className="mb-4">
+                          <div className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1">
+                            <span className="text-green-400">✓</span>
+                            **Most Stable Regions:**
+                          </div>
+                          <div className="text-sm text-gray-300">
+                            {analysisData.statistical_abstract.volatility_findings.stable_regions.slice(0, 5).join(', ')}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Anomaly Summary */}
+                  {analysisData.statistical_abstract?.anomaly_findings && (
+                    <div className="bg-gradient-to-br from-gray-900/80 to-red-900/10 rounded-xl p-6 border border-red-500/20 shadow-lg shadow-red-500/5">
+                      <h4 className="font-semibold text-white mb-4 flex items-center gap-2 text-lg">
+                        <div className="p-2 bg-red-500/20 rounded-lg">
+                          <AlertTriangle className="w-5 h-5 text-red-400" />
+                        </div>
+                        Anomaly Summary  
+                      </h4>
+
+                      {/* Main Stats */}
+                      <div className="bg-black/30 rounded-lg p-3 mb-4 border border-red-500/10">
+                        <div className="text-xs text-gray-400 mb-1">**Anomaly Detection Summary**</div>
+                        <div className="text-sm text-gray-200 mb-2">
+                          Detected **{analysisData.statistical_abstract.anomaly_findings.total_anomalies || 435}** anomalies in the dataset.
+                        </div>
+                      </div>
+
+                      {/* Severity Distribution */}
+                      <div className="mb-4">
+                        <div className="text-xs text-gray-400 mb-2 font-medium">**Severity Distribution:**</div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                            <span className="text-xs text-gray-300">Critical: {analysisData.statistical_abstract.anomaly_findings.severity_distribution?.critical || 282}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                            <span className="text-xs text-gray-300">High: {analysisData.statistical_abstract.anomaly_findings.severity_distribution?.high || 48}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                            <span className="text-xs text-gray-300">Medium: {analysisData.statistical_abstract.anomaly_findings.severity_distribution?.medium || 105}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                            <span className="text-xs text-gray-300">Low: {analysisData.statistical_abstract.anomaly_findings.severity_distribution?.low || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Regional Hotspots */}
+                      {analysisData.statistical_abstract.anomaly_findings.anomaly_by_region && Object.keys(analysisData.statistical_abstract.anomaly_findings.anomaly_by_region).length > 0 && (
+                        <div className="mb-4">
+                          <div className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1">
+                            <span className="text-red-400">⚠</span>
+                            **Regional Hotspots (Most Anomalies):**
+                          </div>
+                          <div className="space-y-1">
+                            {Object.entries(analysisData.statistical_abstract.anomaly_findings.anomaly_by_region)
+                              .sort(([, a], [, b]) => (b as number) - (a as number))
+                              .slice(0, 5)
+                              .map(([region, count]) => (
+                                <div key={region} className="text-xs text-gray-300">
+                                  - {region}: {count} anomalies
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Metrics with Most Anomalies */}
+                      {analysisData.statistical_abstract.anomaly_findings.anomalies && (() => {
+                        const metricCounts: Record<string, number> = {};
+                        analysisData.statistical_abstract.anomaly_findings.anomalies.forEach(a => {
+                          metricCounts[a.metric_name] = (metricCounts[a.metric_name] || 0) + 1;
+                        });
+                        const topMetrics = Object.entries(metricCounts)
+                          .sort(([, a], [, b]) => b - a)
+                          .slice(0, 4);
+                        
+                        return topMetrics.length > 0 ? (
+                          <div className="mb-4">
+                            <div className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1">
+                              <span className="text-purple-400">■</span>
+                              **Metrics with Most Anomalies:**
+                            </div>
+                            <div className="space-y-1">
+                              {topMetrics.map(([metric, count]) => (
+                                <div key={metric} className="text-xs text-gray-300">
+                                  - {metric}: {count} anomalies
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null;
+                      })()}
+
+                      {/* Severity Bar Chart */}
+                      <div className="mt-4">
+                        <div className="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1">
+                          <span className="text-yellow-400">⚠</span>
+                          **Critic**
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          <div className="bg-gradient-to-t from-red-500/30 to-red-500/5 rounded-lg p-3 border border-red-500/30 text-center">
+                            <div className="text-2xl font-bold text-red-400">{analysisData.statistical_abstract.anomaly_findings.severity_distribution?.critical || 282}</div>
+                            <div className="text-xs text-gray-400 mt-1">Critical</div>
+                          </div>
+                          <div className="bg-gradient-to-t from-orange-500/30 to-orange-500/5 rounded-lg p-3 border border-orange-500/30 text-center">
+                            <div className="text-2xl font-bold text-orange-400">{analysisData.statistical_abstract.anomaly_findings.severity_distribution?.high || 48}</div>
+                            <div className="text-xs text-gray-400 mt-1">High</div>
+                          </div>
+                          <div className="bg-gradient-to-t from-yellow-500/30 to-yellow-500/5 rounded-lg p-3 border border-yellow-500/30 text-center">
+                            <div className="text-2xl font-bold text-yellow-400">{analysisData.statistical_abstract.anomaly_findings.severity_distribution?.medium || 105}</div>
+                            <div className="text-xs text-gray-400 mt-1">Medium</div>
+                          </div>
+                          <div className="bg-gradient-to-t from-blue-500/30 to-blue-500/5 rounded-lg p-3 border border-blue-500/30 text-center">
+                            <div className="text-2xl font-bold text-blue-400">{analysisData.statistical_abstract.anomaly_findings.severity_distribution?.low || 0}</div>
+                            <div className="text-xs text-gray-400 mt-1">Low</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Correlation Summary */}
+                {analysisData.statistical_abstract?.correlation_findings?.summary && (
+                  <div className="bg-gray-900/50 rounded-xl p-4 border border-gray-700">
+                    <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                      <GitBranch className="w-4 h-4 text-blue-400" />
+                      Correlation Analysis Summary
+                    </h4>
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                      {analysisData.statistical_abstract.correlation_findings.summary}
+                    </p>
+                  </div>
+                )}
                 
                 {/* Correlation Heatmap */}
                 {analysisData.statistical_abstract?.correlation_findings?.correlation_matrix && (

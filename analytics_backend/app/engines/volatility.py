@@ -382,10 +382,10 @@ class VolatilityScoringEngine:
         stable = [r for r in regional_scores if r.volatility_level == VolatilityLevel.STABLE]
         
         summary_parts.append("**Volatility Distribution:**\n")
-        summary_parts.append(f"- 🔴 Erratic: {len(erratic)} regions\n")
-        summary_parts.append(f"- 🟠 High: {len(high)} regions\n")
-        summary_parts.append(f"- 🟡 Moderate: {len(moderate)} regions\n")
-        summary_parts.append(f"- 🟢 Stable: {len(stable)} regions\n\n")
+        summary_parts.append(f"- 🔴 Erratic (CV>1.0): {len(erratic)} regions - CRITICAL\n")
+        summary_parts.append(f"- 🟠 High (CV>0.5): {len(high)} regions - Needs Attention\n")
+        summary_parts.append(f"- 🟡 Moderate (CV 0.15-0.5): {len(moderate)} regions - Acceptable\n")
+        summary_parts.append(f"- 🟢 Stable (CV<0.15): {len(stable)} regions - Normal Performance\n\n")
         
         # High volatility regions
         if high_volatility_regions:
@@ -395,14 +395,17 @@ class VolatilityScoringEngine:
                 if score:
                     summary_parts.append(
                         f"- **{region}**: CV = {score.coefficient_of_variation:.3f} "
-                        f"({score.volatility_level.value})\n"
+                        f"({score.volatility_level.value}) - {'URGENT' if score.coefficient_of_variation > 1.0 else 'Monitor'}\n"
                     )
                     if score.temporal_pattern:
                         summary_parts.append(f"  - {score.temporal_pattern}\n")
+        else:
+            summary_parts.append("**✅ All regions showing acceptable stability levels.**\n")
         
         # Stable regions
         if stable_regions:
-            summary_parts.append(f"\n**✅ Most Stable Regions:** {', '.join(stable_regions[:5])}\n")
+            summary_parts.append(f"\n**✅ Most Stable Regions (CV<0.15):** {', '.join(stable_regions[:5])}\n")
+            summary_parts.append("These regions show consistent performance with minimal fluctuation.\n")
         
         # Seasonality
         if seasonality_detected:

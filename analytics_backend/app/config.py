@@ -28,9 +28,9 @@ class Settings(BaseSettings):
         default="development"
     )
     
-    # CORS Configuration
+    # CORS Configuration - Allow all origins for development
     cors_origins: List[str] = Field(
-        default=["http://localhost:5173", "http://localhost:3000"]
+        default=["*"]
     )
     
     # Database

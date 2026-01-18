@@ -5,12 +5,14 @@ import { DropZone } from './components/DropZone';
 import { Dashboard } from './components/Dashboard';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard';
 import { analyticsApi } from './services/analyticsApi';
+import type { AnalysisPackage } from './services/analyticsApi';
 
 type AppState = 'hero' | 'upload' | 'dashboard' | 'analytics';
 
 function App() {
   const [appState, setAppState] = useState<AppState>('hero');
   const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<AnalysisPackage | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -32,14 +34,22 @@ function App() {
       if (uploadResponse.job_id) {
         setUploadProgress(40);
         
-        // Trigger analysis on the uploaded data
+        // Trigger analysis on the uploaded data (now returns results directly)
         const analyzeResponse = await analyticsApi.triggerAnalysis(uploadResponse.job_id, {
-          runLlm: false // Skip LLM for faster results initially
+          runLlm: true // Enable LLM for AI-powered insights
         });
-        console.log('Analysis triggered:', analyzeResponse);
+        console.log('Analysis response:', analyzeResponse);
         
-        setUploadProgress(60);
-        setAnalysisId(uploadResponse.job_id);
+        setUploadProgress(100);
+        // Use the job_id from analyze response if available, otherwise use upload response
+        const finalJobId = analyzeResponse.job_id || uploadResponse.job_id;
+        setAnalysisId(finalJobId);
+        
+        // Extract results if available in response
+        if (analyzeResponse.results) {
+          setAnalysisResults(analyzeResponse.results);
+        }
+        
         setAppState('analytics');
       } else {
         // Fallback to demo dashboard if no job_id
@@ -58,6 +68,7 @@ function App() {
 
   const handleNewAnalysis = useCallback(() => {
     setAnalysisId(null);
+    setAnalysisResults(null);
     setUploadProgress(0);
     setUploadError(null);
     setAppState('upload');
@@ -117,6 +128,7 @@ function App() {
             <DropZone onFileUpload={handleFileUpload} isMinimized={true} />
             <AnalyticsDashboard 
               analysisId={analysisId || undefined}
+              analysisResults={analysisResults || undefined}
               onNewAnalysis={handleNewAnalysis}
             />
           </motion.div>

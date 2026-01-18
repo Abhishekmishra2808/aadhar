@@ -11,8 +11,11 @@ Provides RESTful endpoints for:
 import uuid
 import math
 import json
+import tempfile
+import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
+from pathlib import Path
 from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, Query
 from fastapi.responses import JSONResponse
 from loguru import logger
@@ -54,6 +57,7 @@ def sanitize_for_json(obj: Any) -> Any:
 # In-memory storage for analysis jobs (in production, use Redis/database)
 analysis_jobs: Dict[str, Dict[str, Any]] = {}
 orchestrators: Dict[str, AnalysisOrchestrator] = {}
+file_storage: Dict[str, str] = {}  # job_id -> file_path mapping
 
 
 @router.get("/health", response_model=HealthCheckResponse)
@@ -63,6 +67,11 @@ async def health_check():
     
     Returns system status and component availability.
     """
+    llm_configured = bool(
+        settings.openai_api_key or 
+        settings.anthropic_api_key or 
+        settings.huggingface_api_key
+    )
     return HealthCheckResponse(
         status="healthy",
         timestamp=datetime.utcnow(),
@@ -70,7 +79,7 @@ async def health_check():
         components={
             "api": "operational",
             "analytics": "operational",
-            "llm": "configured" if settings.openai_api_key or settings.anthropic_api_key else "not_configured"
+            "llm": "configured" if llm_configured else "not_configured"
         }
     )
 
@@ -108,8 +117,17 @@ async def upload_file(file: UploadFile = File(...)):
         orchestrator = AnalysisOrchestrator()
         response = await orchestrator.ingest_file(content, filename)
         
-        # Store orchestrator for later analysis
+        # Save file to temp storage for persistence across restarts
+        temp_dir = Path(tempfile.gettempdir()) / "aadhaar_pulse_uploads"
+        temp_dir.mkdir(exist_ok=True)
+        temp_file_path = temp_dir / f"{response.job_id}_{filename}"
+        
+        with open(temp_file_path, 'wb') as f:
+            f.write(content)
+        
+        # Store orchestrator and file path for later analysis
         orchestrators[response.job_id] = orchestrator
+        file_storage[response.job_id] = str(temp_file_path)
         
         # Initialize job status
         analysis_jobs[response.job_id] = {
@@ -132,7 +150,6 @@ async def upload_file(file: UploadFile = File(...)):
 @router.post("/analyze/{job_id}")
 async def trigger_analysis(
     job_id: str,
-    background_tasks: BackgroundTasks,
     target_column: Optional[str] = Query(None, description="Primary metric column"),
     region_column: Optional[str] = Query(None, description="Geographic region column"),
     time_column: Optional[str] = Query(None, description="Time/date column"),
@@ -140,39 +157,92 @@ async def trigger_analysis(
     run_llm: bool = Query(True, description="Whether to run LLM reasoning")
 ):
     """
-    Trigger full analysis on uploaded data.
-    
-    Analysis runs in background. Use /status/{job_id} to check progress.
+    Trigger full analysis on uploaded data - returns results immediately for MVP.
     """
+    # Check if orchestrator exists, if not try to recreate from stored file
     if job_id not in orchestrators:
-        raise HTTPException(status_code=404, detail="Job not found. Upload a file first.")
+        if job_id not in file_storage:
+            raise HTTPException(status_code=404, detail="Job not found. Upload a file first.")
+        
+        # Recreate orchestrator from stored file
+        try:
+            file_path = file_storage[job_id]
+            if not os.path.exists(file_path):
+                raise HTTPException(status_code=404, detail="Uploaded file no longer available. Please re-upload.")
+            
+            logger.info(f"Recreating orchestrator for job {job_id} from stored file")
+            filename = os.path.basename(file_path).split('_', 1)[1]  # Remove job_id prefix
+            
+            with open(file_path, 'rb') as f:
+                content = f.read()
+            
+            orchestrator = AnalysisOrchestrator()
+            await orchestrator.ingest_file(content, filename)
+            orchestrators[job_id] = orchestrator
+            
+            # Recreate job status if missing
+            if job_id not in analysis_jobs:
+                analysis_jobs[job_id] = {
+                    "status": AnalysisStatus.PENDING,
+                    "created_at": datetime.utcnow(),
+                    "filename": filename,
+                    "progress": 0,
+                    "result": None,
+                    "error": None
+                }
+            
+            logger.info(f"Orchestrator recreated successfully for job {job_id}")
+        except Exception as e:
+            logger.error(f"Failed to recreate orchestrator for job {job_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to restore analysis session: {str(e)}")
     
-    if analysis_jobs[job_id]["status"] == AnalysisStatus.PROCESSING:
+    if analysis_jobs.get(job_id, {}).get("status") == AnalysisStatus.PROCESSING:
         raise HTTPException(status_code=400, detail="Analysis already in progress")
     
     # Parse dimension columns
     dim_cols = dimension_columns.split(",") if dimension_columns else None
     
-    # Update job status
-    analysis_jobs[job_id]["status"] = AnalysisStatus.PROCESSING
-    analysis_jobs[job_id]["progress"] = 0
-    
-    # Run analysis in background
-    background_tasks.add_task(
-        run_analysis_task,
-        job_id,
-        target_column,
-        region_column,
-        time_column,
-        dim_cols,
-        run_llm
-    )
-    
-    return {
-        "success": True,
-        "job_id": job_id,
-        "message": "Analysis started. Check /status/{job_id} for progress."
-    }
+    try:
+        orchestrator = orchestrators[job_id]
+        
+        # Update job status
+        analysis_jobs[job_id]["status"] = AnalysisStatus.PROCESSING
+        analysis_jobs[job_id]["progress"] = 10
+        
+        # Run analysis synchronously for MVP (no background tasks)
+        result = await orchestrator.run_full_analysis(
+            target_column=target_column,
+            region_column=region_column,
+            time_column=time_column,
+            dimension_columns=dim_cols,
+            run_llm=run_llm
+        )
+        
+        # Store result
+        analysis_jobs[job_id]["status"] = AnalysisStatus.COMPLETED
+        analysis_jobs[job_id]["progress"] = 100
+        analysis_jobs[job_id]["result"] = result
+        analysis_jobs[job_id]["completed_at"] = datetime.utcnow()
+        
+        logger.info(f"Analysis completed for job {job_id}")
+        
+        # Return results directly in response
+        result_dict = result.model_dump()
+        sanitized_result = sanitize_for_json(result_dict)
+        
+        return {
+            "success": True,
+            "job_id": job_id,
+            "message": "Analysis completed",
+            "results": sanitized_result
+        }
+        
+    except Exception as e:
+        logger.error(f"Analysis failed for job {job_id}: {e}")
+        analysis_jobs[job_id]["status"] = AnalysisStatus.FAILED
+        analysis_jobs[job_id]["error"] = str(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 async def run_analysis_task(

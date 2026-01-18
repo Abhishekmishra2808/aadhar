@@ -228,7 +228,7 @@ class AnalyticsApiService {
       dimensionColumns?: string[];
       runLlm?: boolean;
     }
-  ): Promise<{ success: boolean; job_id: string; message: string }> {
+  ): Promise<{ success: boolean; job_id: string; message: string; results?: AnalysisPackage }> {
     const params = new URLSearchParams();
     
     if (options?.targetColumn) params.append('target_column', options.targetColumn);

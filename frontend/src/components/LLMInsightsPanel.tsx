@@ -35,7 +35,7 @@ interface Recommendation {
   recommendation: string;
   rationale: string;
   expected_impact: string;
-  implementation_complexity: 'low' | 'medium' | 'high';
+  implementation_complexity: string;
   affected_regions?: string[];
   timeline?: string;
 }
