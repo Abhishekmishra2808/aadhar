@@ -71,13 +71,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware - permissive for development
+# Add CORS middleware - Allow all origins for production deployment
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=["*"],  # Allow all origins (Vercel, local dev, etc.)
+    allow_credentials=False,  # Set to False when using allow_origins=["*"]
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # Explicit methods
+    allow_headers=["*"],  # Allow all headers
+    expose_headers=["*"],  # Expose all response headers
+    max_age=3600,  # Cache preflight requests for 1 hour
 )
 
 # Add Gzip compression
